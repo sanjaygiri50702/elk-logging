@@ -1,0 +1,22 @@
+filebeat.inputs:
+
+  #pdf service container
+  - type: container
+    paths:
+      - '/var/lib/docker/containers/b9c4d6968fd618ecbd4bdea74d2006b242cd09ab96af362ef933e55f5c73d05b/*.log'
+    processors:
+      - add_docker_metadata: ~
+    tags: ["pdf-service"]
+
+  # backend container
+  - type: container
+    paths:
+      - '/var/lib/docker/containers/0c5495a60c5c475cee04d9b7f612492171293a5c59702fa0936b8593153124ca/*.log'
+    processors:
+      - add_docker_metadata: ~
+    tags: ["backend-service"]
+
+# 31263 is the Node Port of the Logstash Service
+output.logstash:
+  hosts: ["192.168.50.246:32711"]
+  ssl.certificate_authorities: ["/home/yco.user/filebeat/logstash_crt/logstash.crt"]

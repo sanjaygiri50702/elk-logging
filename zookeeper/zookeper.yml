@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  namespace: elastic
+spec:
+  selector:
+    matchLabels:
+      app: zookeeper
+  serviceName: zookeeper-headless
+  replicas: 1
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node
+                operator: In
+                values:
+                - node1
+      containers:
+        - name: kubernetes-zookeeper
+          imagePullPolicy: IfNotPresent
+          image: "gcr.io/google_containers/kubernetes-zookeeper:1.0-3.4.10"
+          ##set resource as required
+          resources:
+          ports:
+            - containerPort: 2181
+              name: client
+            - containerPort: 2888
+              name: server
+            - containerPort: 3888
+              name: leader-elect
+
+          command:
+            ["bash",
+
+              # - "tail -f /dev/null"
+            "-c","start-zookeeper \
+          --servers=1 \
+          --data_dir=/var/lib/zookeeper/data \
+          --data_log_dir=/var/lib/zookeeper/data/log \
+          --conf_dir=/opt/zookeeper/conf \
+          --client_port=2181 \
+          --election_port=3888 \
+          --server_port=2888 \
+          --tick_time=2000 \
+          --init_limit=10 \
+          --sync_limit=5 \
+          --heap=512M \
+          --max_client_cnxns=60 \
+          --snap_retain_count=3 \
+          --purge_interval=12 \
+          --max_session_timeout=60000 \
+          --min_session_timeout=4000 \
+          --log_level=INFO"]
+          volumeMounts:
+            - name: datadir
+              mountPath: /var/lib/zookeeper
+      dnsPolicy: ClusterFirst
+      volumes:
+       - name: datadir
+         emptyDir: {}
+        
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
+      initContainers:
+      - name: init-zoo
+        command:
+        - chown
+        - -R
+        - 1000:1000
+        - /var/lib/zookeeper
+        image: busybox:latest
+        imagePullPolicy: IfNotPresent
+        name: volume-permissions
+        resources: {}
+        securityContext:
+
+          runAsUser: 0
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - name: datadir
+          mountPath: /var/lib/zookeeper

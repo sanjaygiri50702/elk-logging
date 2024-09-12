@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: elastic
+  labels:
+    app: kafka
+spec:
+  serviceName: kafka
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+      
+    spec:
+      containers:
+        - name: kafka-container
+          image: bitnami/kafka:3.3.1
+          imagePullPolicy: "IfNotPresent"
+          ## set resources as required
+          # resources:
+          #   requests:
+          #     memory: "0.5Gi"
+          #     cpu: "1"
+          #   limits:
+          #     memory: "1Gi"
+          #     cpu: "1"
+          ports:
+            - containerPort: 9092
+              name: internal
+            - containerPort: 9094
+              name: external
+          #command: ["/bin/sh" , "-c"]
+          #args:
+          #  - rm -rf /bitnami/kafka/data/lost+found ;
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /bitnami/kafka/data
+            - name: kafka-certs
+              mountPath: /bitnami/kafka/config/certs
+          env:
+            - name: KAFKA_CFG_ADVERTISED_LISTENERS
+              value: "INTERNAL://192.168.50.246:30006,EXTERNAL://192.168.50.246:30007"   # use ip address of master node :internal and external nodeports of kafka services 
+            - name: KAFKA_CFG_ZOOKEEPER_CONNECT
+              value: "zookeeper-service:2181"  ##Hostname or ip of  zookeeper
+            - name: ALLOW_PLAINTEXT_LISTENER
+              value: "yes"
+            - name: KAFKA_CFG_LISTENERS
+              value: "INTERNAL://:9092,EXTERNAL://:9094"
+            - name: KAFKA_CFG_INTER_BROKER_LISTENER_NAME
+              value: "INTERNAL"
+            - name: KAFKA_CFG_SSL_KEYSTORE_FILENAME
+              value: /bitnami/kafka/config/certs/kafka.keystore.jks   ## new certs
+            - name: KAFKA_CFG_SSL_KEYSTORE_PASSWORD
+              value: "123456"
+            - name: KAFKA_CFG_SSL_TRUSTSTORE_FILENAME
+              value: /bitnami/kafka/config/certs/kafka.truststore.jks   ## new certs
+            - name: KAFKA_CFG_SSL_TRUSTSTORE_PASSWORD                    ## passkey used for creating certs
+              value: "123456"
+            - name: KAFKA_CFG_SSL_KEY_PASSWORD
+              value: "123456"
+            - name: KAFKA_CFG_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
+              value: ' '
+            - name: KAFKA_CFG_SSL_CLIENT_AUTH
+              value: 'requested'
+            - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+              value: 'INTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:SSL'
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms2g -Xmx2g"
+      #dnsPolicy: ClusterFirstWithHostNet
+      volumes:
+      - name: kafka-data
+        emptyDir: {}
+      - name: kafka-certs
+        secret:
+          secretName: kafka-certs
+      # - name: kafka-data-1
+      #   persistentVolumeClaim:
+      #     claimName: kafka-pvc
+
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
+
+      initContainers:
+      - name: delete-lost-found
+        image: busybox:latest
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+          - mountPath: /bitnami/kafka/data
+            name: kafka-data
+        command:
+        - "sh"
+        - "-c"
+        - "cd /bitnami/kafka/data && rm -rf lost+found"

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-configmap
+  namespace: elastic
+data:
+  logstash.yml: |
+
+
+    http.host:  0.0.0.0
+  LS_JAVA_OPTS:  -Xms2g -Xmx2g
+  LS_SETTINGS_DIR: /usr/share/logstash/config
+
+
+  pipelines.yml: |
+
+    - pipeline.id: inteliome-pdf
+      path.config: "/usr/share/logstash/pipeline/services.conf"

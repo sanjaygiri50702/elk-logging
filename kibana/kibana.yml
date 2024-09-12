@@ -1,0 +1,36 @@
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  name: kibana
+  namespace: elastic
+spec:
+  version: 8.8.1
+  http:
+    service:
+      spec:
+        type: NodePort  # Change the service type to NodePort
+        ports:
+          - name: kibana-kb-http
+            port: 5601
+            targetPort: 5601
+            nodePort: 30013  # Specify the desired NodePort number
+
+  count: 1
+  elasticsearchRef:
+    name: elasticsearch
+
+  podTemplate:
+      spec:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: node
+                  operator: In
+                  values:
+                  - node1
+
+        containers:
+        - name: kibana
+          resources:

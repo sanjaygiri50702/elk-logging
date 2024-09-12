@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: logstash-deployment
+  namespace: elastic
+spec:
+  serviceName: "logstash"
+  selector:
+    matchLabels:
+      app: logstash
+  updateStrategy:
+    type: RollingUpdate
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: logstash
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node
+                operator: In
+                values:
+                - node1
+
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+
+      containers:
+      - name: logstash
+        image: docker.elastic.co/logstash/logstash:8.8.1
+        imagePullPolicy: "IfNotPresent"
+        env:
+        - name: LS_JAVA_OPTS
+          valueFrom:
+              configMapKeyRef:
+                  name: logstash-configmap
+                  key: LS_JAVA_OPTS
+
+        - name : LS_SETTINGS_DIR
+          valueFrom:
+              configMapKeyRef:
+                  name: logstash-configmap
+                  key: LS_SETTINGS_DIR
+
+        - name: ES_HOSTS
+          value: "https://elasticsearch-es-http:9200"
+        - name: ES_USER
+          value: "admin"
+        - name: ES_PASSWORD
+          value: "Admin@123"
+        # set resources as required
+        ports:
+          - containerPort: 5044
+
+        volumeMounts:
+          - name: config-volume
+            mountPath: /usr/share/logstash/config
+          - name: logstash-pipeline-volume
+            mountPath: /usr/share/logstash/pipeline
+          - name: cert-ca
+            mountPath: /etc/logstash/certificates
+            readOnly : true
+        command: ["/bin/sh","-c"]
+        args:
+          - bin/logstash   --config.reload.automatic;
+
+      volumes:
+        - name: config-volume
+          configMap:
+            name: logstash-configmap
+            items:
+              - key: logstash.yml
+                path: logstash.yml
+              - key: pipelines.yml
+                path: pipelines.yml
+        - name: cert-ca
+          secret:
+            secretName: elasticsearch-es-http-certs-public
+
+  volumeClaimTemplates:
+   - metadata:
+       name: logstash-pipeline-volume
+     spec:
+       accessModes: [ "ReadWriteOnce" ]
+       resources:
+         requests:
+           storage: 3Gi
+       storageClassName: openebs-hostpath
